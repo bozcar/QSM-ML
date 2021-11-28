@@ -9,30 +9,22 @@ class phase_map:
     A class for handling phase map data. 
     Can be initialised with a suceptibility map to create a simulation of the phase map which would be produced from the suceptibility distribution.
     """
-    def __init__(self, SM, mode:str = 's'):
-        """
-        Can be initialised in various modes:
-        - s - Simulated from a suceptibility map
-        - d - Directly loaded from a file
-        """
-        if mode.lower() == 's':
-            #TODO: implement simulation init
-            raise NotImplementedError
-        elif mode.lower() == 'd':
-            #TODO: implement direct init
-            raise NotImplementedError
-        else:
-            raise ValueError(f"Mode {mode} is not a recognised mode.")
+    def __init__(self, file_path:Path):
+        self.img = nib.load(file_path)
+        self.img_data = self.img.get_fdata()
+
+    def apply_mask(self, mask:np.ndarray):
+        self.masked = self.img_data * mask
 
     def save(self):
         raise NotImplementedError
 
-pm_path = Path("Datasets/Frequency.nii")
-mask_path = Path("Datasets/MaskBrainExtracted.nii")
+# pm_path = Path("Replication/Datasets/Frequency.nii")
+# mask_path = Path("Replication/Datasets/MaskBrainExtracted.nii")
 
-img = nib.load(pm_path)
-mask = nib.load(mask_path)
+# img = nib.load(pm_path)
+# mask = nib.load(mask_path)
 
-img_data = img.get_fdata()
-mask_data = img.get_fdata()
+# img_data = img.get_fdata()
+# mask_data = img.get_fdata()
 
