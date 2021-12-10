@@ -25,8 +25,13 @@ class dipole_kernel:
                         self.inv_kernel[i,j,k] = 1 / self.kernel[i,j,k]
     
 class dipole_kernel_nsq:
+    """
+    # Dipole Kernel
+    Handles the creation of a dipole kernel in its k-space formulation. 
+    Initialises with both the kernel and its inverse which is truncated in positions where the absulute value of the kernel is less than the threshold value.
+    The value of the inverse kernel in the truncated positions are 1/threshold (or -1/threshold where the truncated value was negative).  
+    """
     def __init__(self, size:list, threshold:float):
-        # halves = [int(lenth/2) for lenth in size]
         ONE_THIRD = 1/3
 
         x = np.arange(-1, 1, 2 / size[0])
@@ -47,6 +52,6 @@ class dipole_kernel_nsq:
     def create_inv_kernel(self, threshold:float):
         self.inv_kernel = np.zeros(np.shape(self.kernel))
 
-        self.inv_kernel[np.logical_or(0 <= self.kernel, self.kernel< threshold)] = 1 / threshold
-        self.inv_kernel[np.logical_or(0 > self.kernel, self.kernel > -1 * threshold)] = -1 / threshold
+        self.inv_kernel[np.logical_and(0 <= self.kernel, self.kernel< threshold)] = 1 / threshold
+        self.inv_kernel[np.logical_and(0 > self.kernel, self.kernel > -1 * threshold)] = -1 / threshold
         self.inv_kernel[np.logical_or(threshold <= self.kernel, -1 * threshold >= self.kernel)] = 1 / self.kernel[np.logical_or(threshold <= self.kernel, -1 * threshold >= self.kernel)]

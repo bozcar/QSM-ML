@@ -13,9 +13,13 @@ def main():
     pm = phase_map.phase_map(pm_path)
     mask = phase_map.phase_map(mask_path)
 
-    kernel = kernels.dipole_kernel_nsq(np.shape(pm.img_data), 0.15)
+    kernel = kernels.dipole_kernel_nsq(np.shape(pm.img_data), 0.1)
 
     images.show_image(kernel.kernel[0,:,:])
+    images.show_image(kernel.kernel[:,:,80])
+
+    images.show_image(kernel.inv_kernel[0,:,:])
+    images.show_image(kernel.inv_kernel[:,:,80])
 
     qsm = np.fft.ifftn(np.fft.fftn(pm.img_data/8) * kernel.inv_kernel)
     qsm_masked = qsm * mask.img_data
