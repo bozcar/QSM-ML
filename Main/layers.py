@@ -63,7 +63,7 @@ class ConvDipole(layers.Layer):
         # Wait until an image is passed to the layer to generate 
         # a dipole kernel with appropriate dimensions
         if not self.is_built:
-            self.kernel = self.__generate_dipole(tf.shape(img))
+            self.kernel = self.generate_dipole(tf.shape(img))
             self.is_built = True
 
         kimg = tf.signal.fft3d(img)
@@ -71,7 +71,7 @@ class ConvDipole(layers.Layer):
         return conv
 
     @staticmethod
-    def __generate_dipole(shape: Tuple[int]):
+    def generate_dipole(shape: Tuple[int]):
         """Generate a dipole kernel in k-space with the given `shape`."""
         ONE_THIRD = 1/3
 
@@ -84,7 +84,7 @@ class ConvDipole(layers.Layer):
         denom = vx**2 + vy**2 + vz**2
         z_squared = vz**2
 
-        kernel = tf.where(denom!=0, ONE_THIRD-(z_squared/denom), tf.zeros(shape, dtype = tf.float32))
+        kernel = tf.where(denom!=0, ONE_THIRD-(z_squared/denom), tf.zeros(shape, dtype = tf.float64))
         kernel = tf.signal.fftshift(kernel)
         kernel = tf.cast(kernel, tf.complex64) # Required for complatibility with fourier transformation
 
@@ -112,7 +112,8 @@ class WeightedSubtract(layers.Layer):
     def __init__(self, tau: float = 2, name: str = None) -> None:
         super().__init__(name=name)
         self.tau = tf.Variable(
-            initial_value=tau, 
+            initial_value=tau,
+            dtype=tf.complex64,
             trainable=True
         )
     

@@ -3,7 +3,19 @@ from tensorflow import keras
 
 from layers import *
 
-class NDIModel(keras.Model):
+def NDIGrad(
+    sus: tf.Tensor, 
+    phase: tf.Tensor, 
+    weight: tf. Tensor, 
+    conv: ConvDipole
+) -> tf.Tensor:
+    """The gradient of the NDI cost function."""
+    w_squared = weight * weight
+    diff = conv(sus) - phase
+    return conv(w_squared * tf.math.sin(diff))
+
+
+class NDIModel:
     r"""Base class for implementing Nonlinear Dipole Inversion (NDI).
 
     This class allows for easy implementation of the NDI algorithm as a keras model.
@@ -49,8 +61,7 @@ class NDIModel(keras.Model):
        NMR in Biomedicine, vol. 12, pp. e4271, 2020.
 
     """
-    def __init__(self, name: str = None) -> None:
-        super().__init__(name=name)
+    def __init__(self):
         self.dipole_convolution = ConvDipole()
 
     def __NDIGrad(self, sus, phase, weight) -> tf.Tensor:
@@ -60,7 +71,7 @@ class NDIModel(keras.Model):
         return self.dipole_convolution(w_squared * tf.math.sin(diff))
 
 
-class FixedStepNDI(NDIModel):
+class FixedStepNDI(keras.Model):
     """NDI model with one trainbable step size.
 
     Class for training the step size of the NDI model. It contains one `WeightedSubtract` layer
@@ -77,17 +88,25 @@ class FixedStepNDI(NDIModel):
     def __init__(self, iters: int, name: str = None) -> None:
         super().__init__(name)
         self.iters = iters
+        self.dipole_convolution = ConvDipole()
         self.step = WeightedSubtract(tau=2)
 
     @tf.function
     def call(self, phase: tf.Tensor, weight: tf.Tensor) -> tf.Tensor:
         """Applies the `WeightedSubtract` layer `iters` times."""
+        # Cast to complex numbers to allow for fourier transforms
         sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
-        for _ in range(self.iters):
-            sus = self.step(sus, self.__NDIGrad(sus, phase, weight))
+        pha = tf.cast(phase, dtype=tf.complex64)
+        wei = tf.cast(weight, dtype=tf.complex64)
+
+        for i in range(self.iters):
+            sus = self.step(sus, NDIGrad(sus, pha, wei, self.dipole_convolution))
+            if i + 1 % 10 == 0:
+                print(f"Iteration {i+1}/{self.iters} complete.")
+        
         return sus
 
-class VariableStepNDI(NDIModel):
+class VariableStepNDI(keras.Model):
     """NDI model where each step size can be trained independently.
 
     Class for training an NDI model where the step size can vary on each 
@@ -104,12 +123,21 @@ class VariableStepNDI(NDIModel):
     """
     def __init__(self, iters: int, name: str = None) -> None:
         super().__init__(name)
+        self.dipole_convolution = ConvDipole()
         self.steps = [WeightedSubtract(name=f"setp{i}") for i in range(iters)]
 
     @tf.function
     def call(self, phase: tf.Tensor, weight: tf.Tensor) -> tf.Tensor:
         """Applies each of the `iters` `WeightedSubtract` layers."""
         sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
+        pha = tf.cast(phase, dtype=tf.complex64)
+        wei = tf.cast(weight, dtype=tf.complex64)
+
+        i = 0
         for step in self.steps:
-            sus = step(sus, self.__NDIGrad(sus, phase, weight))
+            sus = step(sus, NDIGrad(sus, pha, wei, self.dipole_convolution))
+            if i % 10 == 0:
+                print(f"Iteration {i+1}/{len(self.steps)} complete.")
+            i += 1
+        
         return sus
