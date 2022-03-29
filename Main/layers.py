@@ -63,7 +63,12 @@ class ConvDipole(layers.Layer):
         # Wait until an image is passed to the layer to generate 
         # a dipole kernel with appropriate dimensions
         if not self.is_built:
-            self.kernel = self.generate_dipole(tf.shape(img))
+            n_imgs, *shape = img.shape
+            if not len(shape) == 3:
+                raise ValueError(f"Input image has {len(shape)} dimensions, expected 3")
+            self.kernel = self.generate_dipole(shape)
+            self.kernel = tf.expand_dims(self.kernel, 0) # Add n_imgs dimension
+            self.kernel = tf.tile(self.kernel, [n_imgs, 1, 1, 1])
             self.is_built = True
 
         kimg = tf.signal.fft3d(img)

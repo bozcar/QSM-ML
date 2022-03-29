@@ -3,6 +3,8 @@ from tensorflow import keras
 
 from layers import *
 
+from typing import Tuple
+
 def NDIGrad(
     sus: tf.Tensor, 
     phase: tf.Tensor, 
@@ -92,8 +94,10 @@ class FixedStepNDI(keras.Model):
         self.step = WeightedSubtract(tau=2)
 
     @tf.function
-    def call(self, phase: tf.Tensor, weight: tf.Tensor) -> tf.Tensor:
+    def call(self, t: tf.Tensor) -> tf.Tensor:
         """Applies the `WeightedSubtract` layer `iters` times."""
+        phase = t[:, 0, :, :, :]
+        weight = t[:, 1, :, :, :]
         # Cast to complex numbers to allow for fourier transforms
         sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
         pha = tf.cast(phase, dtype=tf.complex64)
@@ -102,7 +106,7 @@ class FixedStepNDI(keras.Model):
         for i in range(self.iters):
             sus = self.step(sus, NDIGrad(sus, pha, wei, self.dipole_convolution))
             if i + 1 % 10 == 0:
-                print(f"Iteration {i+1}/{self.iters} complete.")
+                tf.print(i+1, message="Completed iteration: ")
         
         return sus
 
