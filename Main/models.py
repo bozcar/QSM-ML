@@ -99,14 +99,10 @@ class FixedStepNDI(keras.Model):
         phase = t[:, 0, :, :, :]
         weight = t[:, 1, :, :, :]
         # Cast to complex numbers to allow for fourier transforms
-        sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
-        pha = tf.cast(phase, dtype=tf.complex64)
-        wei = tf.cast(weight, dtype=tf.complex64)
+        sus = tf.zeros(tf.shape(phase))
 
-        for i in range(self.iters):
-            sus = self.step(sus, NDIGrad(sus, pha, wei, self.dipole_convolution))
-            if i + 1 % 10 == 0:
-                tf.print(i+1, message="Completed iteration: ")
+        for _ in range(self.iters):
+            sus = self.step(sus, NDIGrad(sus, phase, weight, self.dipole_convolution))
         
         return sus
 

@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from layers import ConvDipole
 
@@ -39,7 +40,7 @@ class shapes:
 
     """
     def __init__(self, tensor: tf.Tensor):
-        self.tensor = tf.cast(tensor, tf.complex64)
+        self.tensor = tensor
 
     def __str__(self):
         return str(self.tensor.numpy())
@@ -156,3 +157,10 @@ class shapes:
 
     def get_mask(self):
         return tf.cast(tf.where(self.tensor != 0, tf.ones(self.tensor.shape), tf.zeros(self.tensor.shape)), tf.complex64)
+
+    @staticmethod
+    def disp_image(slice):
+        plt.imshow(slice, cmap='gray')
+        plt.colorbar()
+        plt.show()
+        return

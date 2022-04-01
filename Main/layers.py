@@ -68,12 +68,11 @@ class ConvDipole(layers.Layer):
                 raise ValueError(f"Input image has {len(shape)} dimensions, expected 3")
             self.kernel = self.generate_dipole(shape)
             self.kernel = tf.expand_dims(self.kernel, 0) # Add n_imgs dimension
-            self.kernel = tf.tile(self.kernel, [n_imgs, 1, 1, 1])
             self.is_built = True
 
-        kimg = tf.signal.fft3d(img)
+        kimg = tf.signal.fft3d(tf.cast(img, dtype=tf.complex64))
         conv = tf.signal.ifft3d(kimg * self.kernel)
-        return conv
+        return tf.math.real(conv)
 
     @staticmethod
     def generate_dipole(shape: Tuple[int]):
@@ -118,7 +117,7 @@ class WeightedSubtract(layers.Layer):
         super().__init__(name=name)
         self.tau = tf.Variable(
             initial_value=tau,
-            dtype=tf.complex64,
+            dtype=tf.float32,
             trainable=True
         )
     
