@@ -17,7 +17,12 @@ def main():
 
     REGION = (200, 250, 225)
 
-    m = FixedStepNDI(100)
+    m = FixedStepNDI(
+        iters=100, 
+        name='fixed', 
+        initial_step=1.
+    )
+
     sus = [shapes.sphere(REGION, (100, 125, 150), 50, 0.000006)]
 
     x_train = np.array([[s.get_phase(1).numpy(), np.ones(REGION)] for s in sus])
