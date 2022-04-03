@@ -194,4 +194,7 @@ cython_debug/
 # Support for Project snippet scope
 !.vscode/*.code-snippets
 
+# Log files
+**/logs
+
 # End of https://www.toptal.com/developers/gitignore/api/c++,python,visualstudiocode
