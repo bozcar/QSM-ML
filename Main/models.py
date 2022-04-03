@@ -1,9 +1,9 @@
+from typing import Tuple
+
 import tensorflow as tf
 from tensorflow import keras
 
-from layers import *
-
-from typing import Tuple
+from .layers import *
 
 def NDIGrad(
     sus: tf.Tensor, 

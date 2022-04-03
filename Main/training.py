@@ -6,8 +6,8 @@ def main():
     import tensorflow as tf
     from tensorflow import keras
 
-    from models import FixedStepNDI, VariableStepNDI
-    from shapes import shapes
+    from .models import FixedStepNDI, VariableStepNDI
+    from .shapes import shapes
 
     PARAMS = {
         'nucleus' : 'H1',

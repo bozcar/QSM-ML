@@ -63,7 +63,7 @@ class ConvDipole(layers.Layer):
         # Wait until an image is passed to the layer to generate 
         # a dipole kernel with appropriate dimensions
         if not self.is_built:
-            n_imgs, *shape = img.shape
+            _, *shape = img.shape
             if not len(shape) == 3:
                 raise ValueError(f"Input image has {len(shape)} dimensions, expected 3")
             self.kernel = self.generate_dipole(shape)

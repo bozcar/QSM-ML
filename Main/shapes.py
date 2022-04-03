@@ -3,7 +3,7 @@ from typing import Tuple
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from layers import ConvDipole
+from .layers import ConvDipole
 
 class shapes:
     GAMMA = {
