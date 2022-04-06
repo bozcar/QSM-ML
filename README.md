@@ -1,5 +1,7 @@
 # QSMLearn
-This repository contains the code connected with my MRes project: "Physics Informed Machine Learning Reconstruction/Technique for MRI Qunatitative Susceptibility Mapping (QSM)".
+This repository contains the code connected with my MRes project: "Physics Informed Machine Learning Reconstruction/Technique for MRI Qunatitative Susceptibility Mapping (QSM)". It is best to install the packages in the source directory before attempting to run the code. E.g. with pip use:
+
+`pip install git+https://github.com/bozcar/QSM-ML.git#egg=QSMLearn`
 
 ## Author
 - Oscar Goldman - o.goldman@ucl.ac.uk
