@@ -1,7 +1,13 @@
+from email.mime import base
+import os
+from pathlib import Path
+import re
 from typing import Tuple
 
-import tensorflow as tf
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorboard
+import tensorflow as tf
 
 from .layers import ConvDipole
 
@@ -164,3 +170,54 @@ class shapes:
         plt.colorbar()
         plt.show()
         return
+
+
+class shapeCollection:
+    def __init__(self, tensor: tf.Tensor) -> None:
+        self.tensor = tensor
+        self.shape = tensor.shape
+
+    def __str__(self) -> str:
+        return str(self.tensor.numpy())
+
+    def save(
+        self,
+        filename: str = None,
+        *,
+        dir: str = 'data',
+        default_name: str = 'collection',
+        is_absolute: bool = False
+    ) -> None:
+        
+        base_dir = Path(f"./{dir}")
+
+        if base_dir.is_dir(): 
+            if filename is None:
+                # Find files with names which conflict with the default filename
+                names = os.listdir(base_dir)
+                is_match = lambda x : bool(re.fullmatch(f"{default_name}_?\d*.npy", x)) # Matches to <default filename>_<number>.npy
+                matched_names = list(filter(is_match, names))
+
+                if matched_names:
+                    numbers = [] # Appended numbers
+                    for name in matched_names:
+                        digits = re.findall("\d+", name)
+                        numbers += [int(d) for d in digits]
+                    
+                    if numbers:
+                        append = max(numbers) + 1
+                        np.save(base_dir / f"{default_name}_{append}", self.tensor.numpy())
+                    else:
+                        np.save(base_dir / f"{default_name}_1", self.tensor.numpy())
+                else:
+                    np.save(base_dir / f"{default_name}", self.tensor.numpy())
+            else:
+                if is_absolute:
+                    raise NotImplementedError
+                else:
+                    if (base_dir / f"{filename}.npy").exists():
+                        raise ValueError(f"Cannot save shape as {filename}.npy: file already exists.") # TODO: Implement optional overwriting
+                    else:
+                        np.save(base_dir / f"{filename}")
+        else:
+            raise ValueError(f"Cannot save to {str(base_dir.absolute())}: directory does not exist.")

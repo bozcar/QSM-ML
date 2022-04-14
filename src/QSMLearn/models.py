@@ -5,6 +5,7 @@ from tensorflow import keras
 
 from .layers import *
 
+
 def NDIGrad(
     sus: tf.Tensor, 
     phase: tf.Tensor, 
@@ -87,11 +88,11 @@ class FixedStepNDI(keras.Model):
         An optional name for the model
     
     """
-    def __init__(self, iters: int, name: str = None) -> None:
+    def __init__(self, iters: int, name: str = None, init_step: float = 2) -> None:
         super().__init__(name)
         self.iters = iters
         self.dipole_convolution = ConvDipole()
-        self.step = WeightedSubtract(tau=2)
+        self.step = WeightedSubtract(tau=init_step)
 
     @tf.function
     def call(self, t: tf.Tensor) -> tf.Tensor:
@@ -105,6 +106,7 @@ class FixedStepNDI(keras.Model):
             sus = self.step(sus, NDIGrad(sus, phase, weight, self.dipole_convolution))
         
         return sus
+
 
 class VariableStepNDI(keras.Model):
     """NDI model where each step size can be trained independently.

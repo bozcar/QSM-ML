@@ -35,7 +35,9 @@ def main():
         epochs=10
     )
 
-def training(model_choice: str, steps: int):
+def training(model_choice: str, steps: int, *, x_train, y_train, **kwargs):
+    from tensorflow import keras
+
     from .models import FixedStepNDI, VariableStepNDI
 
     MODELS = {
@@ -43,7 +45,19 @@ def training(model_choice: str, steps: int):
         'vs' : VariableStepNDI
     }
 
-    m = MODELS[model_choice](steps)
+    m = MODELS[model_choice](steps, kwargs = kwargs)
+
+    m.compile(
+        optimizer='adam',
+        loss=keras.losses.MeanSquaredError()
+    )
+
+    return m.fit(
+        x = x_train,
+        y = y_train, 
+        batch_size = 1,
+        epochs = 10
+    )
 
 def trainQSM():
     from argparse import ArgumentParser
@@ -58,4 +72,4 @@ def trainQSM():
     training(arguments.model, arguments.steps)
 
 if __name__ == '__main__':
-    main()
+    trainQSM()
