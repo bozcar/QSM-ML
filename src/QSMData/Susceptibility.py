@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .utils import deformation_field_from_affine_matrix, resample_with_deformation_field
+
 
 class Shapes:
     def __init__(self, dist: np.ndarray) -> None:
@@ -35,7 +37,7 @@ class Shapes:
     def sphere(
         cls,
         shape: tuple[int],
-        value: float
+        value: float = 1
     ):
         """Constructor to generate a sphere.
 
@@ -90,17 +92,72 @@ class Shapes:
         return cls(s) #TODO: check centre calculation
 
     @classmethod
-    def cylinder(cls):
+    def cylinder(
+        cls,
+        shape: tuple[int],
+        value: float = 1
+    ):
         """Constructor to generate a cylinder.
         
+        Generates a cylinder of susceptibility `value` in the centre of an 
+        image with dimensions (x, y, z) in `shape`. The diameter of the 
+        circular face, and the height of the cylinder are both half of the 
+        shortest dimension.
+
+        The cylinder is oriented with its height in the z direction.
+
+        Parameters
+        ----------
+        shape : tuple[int, int, int]
+            The resolution of the image in (x, y, z)
+        
+        value : float
+            The value of the susceptibility inside the cylinder
+
+        Returns
+        -------
+        Shapes
+            A `Shapes` object containing a cylinder.
+
+        See Also
+        --------
+        Shapes.sphere
+            Constructor to generate a sphere.
+
+        Shapes.cube
+            Constructor to generate a cube.
+
+        Notes
+        -----
+        To change the size/position/angle of the cylinder, apply
+        the appropriate affine transformation.
+
         """
-        raise NotImplementedError
+        shortest = min(shape)
+        r = floor(shortest / 4)
+
+        xlim, ylim, zlim = shape
+        #centres
+        xc = floor(xlim / 2)
+        yc = floor(ylim / 2)
+        zc = floor(zlim / 2)
+
+        x, y, z = np.mgrid[:xlim, :ylim, :zlim]
+
+        inside = ((x - xc)**2 + (y - yc)**2 < r ** 2) & (np.abs(z - zc)) < r
+
+        s = np.where(
+            inside,
+            value * np.ones(shape),
+            np.zeros(shape)
+        )
+        return cls(s)
 
     @classmethod
     def cube(
         cls,
         shape: tuple[int],
-        value: float
+        value: float = 1
     ):
         """Constructor to generate a cube.
 
@@ -161,13 +218,15 @@ class AffineTransform:
     def __init__(self, matrix:np.ndarray) -> None:
         """Performs affine transformations on susceptibility images.
 
-
+        Class for applying affine transformations to `Shapes` objects. Provides 
+        utilities to initialise affine transformations either from a set of 
+        affine parameters (translation, rotation, scaling, shear) or randomly. 
         
         """
         self._matrix = matrix
 
     def __call__(self, object):
-        return self.resample_shape(object)
+        return self.transform_shape(object)
 
     def __matmul__(self, other):
         if isinstance(other, AffineTransform):
@@ -277,6 +336,23 @@ class AffineTransform:
             ]
         )
 
+        T_pre = np.array(
+            [
+                [],
+                [],
+                [],
+                []
+            ]
+        )
+
+        T_post = np.array(
+            [
+                [],
+                [],
+                [],
+                []
+            ]
+        )
         #TODO: rotate about the centre
 
         T_tot = T_t @ T_rx @ T_ry @ T_rz @ T_sh @ T_sc
@@ -284,19 +360,69 @@ class AffineTransform:
 
     @classmethod
     def from_random(cls, **kwargs):
+        """Construct a random affine transformation matrix.
+
+        Initialises the AffineTransform with random parameters as per the randomise 
+        method.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments to pass to the randomise method.
+
+        Returns
+        -------
+        AffineTransform
+            An affine transform with random parameters.
+
+        See Also
+        --------
+        AffineTransform.randomise
+            Change the parametrs of the affine transform to new, randomly selected, 
+            parameters.
+        
+        """
         transform = cls(np.eye(4))
         transform.randomise(**kwargs)
 
         return transform
 
-    def randomise(self) -> None:
+    def randomise(self, seed: int) -> None:
         """Randomise the parameters of the transform.
         
         """
+        rng = np.random.default_rng(seed)
         raise NotImplementedError
 
-    def resample_shape(self, shape: Shapes) -> Shapes:
-        raise NotImplementedError
+    def transform_shape(self, shape: Shapes, **kwargs) -> Shapes:
+        """Produce a `Shapes` obejct by transforming a shape with the affine transform.
+
+        Parameters
+        ----------
+        shape: Shapes
+            The distribution to which the transformation will be applied.
+
+        **kwargs
+            Keyword arguments passed to `utils.resample_with_deformation_field`.
+
+        Returns
+        -------
+        Shapes
+            A `Shapes` ojbect containing the transformed distribution.
+
+        See Also
+        --------
+        utils.resample_with_deformation_field
+            This function is used by this method to produce the transformed image. 
+            See this function to find options which can be passed to control how the 
+            interpolation is done when producing the transformed image.
+        
+        """
+        def_field = deformation_field_from_affine_matrix(self.matrix, shape.shape)
+        resampled_dist = resample_with_deformation_field(shape.dist, def_field, **kwargs)
+
+        s = Shapes(resampled_dist)
+        return s
 
 
 class Distribution:
@@ -317,4 +443,5 @@ class Distribution:
 
     def save(self, filename):
         filepath = Path(filename)
+        np.save(filepath, self.dist)
         raise NotImplementedError

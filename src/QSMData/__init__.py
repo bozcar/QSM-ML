@@ -1,1 +1,1 @@
-__all__ = ['Susceptibility']
+__all__ = ['Susceptibility', 'utils']
