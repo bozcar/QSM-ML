@@ -260,7 +260,7 @@ class AffineTransform:
     @classmethod
     def from_params(
         cls, 
-        params=[0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0.]
+        params: tuple[float]=(0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0.)
         ):
         """Construct affine transformation matrix from affine parameters.
 
@@ -285,7 +285,7 @@ class AffineTransform:
         tx, ty, tz, rx, ry, rz, sx, sy, sz, shxy, shxz, shyx, shyz, shzx, shzy = params
 
         srx, sry, srz = np.sin((rx, ry, rz))
-        crx, cry, crz = np.sin((rx, ry, rz))
+        crx, cry, crz = np.cos((rx, ry, rz))
 
         T_t = np.array(
             [
