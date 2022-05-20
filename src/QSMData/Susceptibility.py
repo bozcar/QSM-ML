@@ -1,9 +1,10 @@
 from math import floor
 from pathlib import Path
+from types import NotImplementedType
 
 import numpy as np
 
-from .utils import deformation_field_from_affine_matrix, resample_with_deformation_field
+from .utils import *
 
 
 class Shapes:
@@ -228,6 +229,9 @@ class AffineTransform:
     def __call__(self, object):
         return self.transform_shape(object)
 
+    def __repr__(self):
+        return str(self.matrix)
+
     def __matmul__(self, other):
         if isinstance(other, AffineTransform):
             product = self.matrix @ other.matrix
@@ -235,6 +239,7 @@ class AffineTransform:
         else:
             return self.matrix @ other
 
+    # Properties
     @property
     def matrix(self):
         return self._matrix
@@ -257,10 +262,12 @@ class AffineTransform:
     def matrix(self):
         del self._matrix
 
+    # Constructors
     @classmethod
     def from_params(
         cls, 
-        params: tuple[float]=(0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0.)
+        params: tuple[float]=(0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0.),
+        **kwargs
         ):
         """Construct affine transformation matrix from affine parameters.
 
@@ -284,78 +291,14 @@ class AffineTransform:
         """
         tx, ty, tz, rx, ry, rz, sx, sy, sz, shxy, shxz, shyx, shyz, shzx, shzy = params
 
-        srx, sry, srz = np.sin((rx, ry, rz))
-        crx, cry, crz = np.cos((rx, ry, rz))
+        T_t = cls.translation_matrix(tx, ty, tz)
+        T_r = cls.rotation_matrix(rx, ry, rz, **kwargs)
+        T_sc = cls.scaling_matrix(sx, sy, sz)
+        T_sh = cls.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
 
-        T_t = np.array(
-            [
-                [1, 0, 0, tx],
-                [0, 1, 0, ty],
-                [0, 0, 1, tz],
-                [0, 0, 0,  1]
-            ]
-        )
-        T_rx = np.array(
-            [
-                [1,   0,    0, 0],
-                [0, crx, -srx, 0],
-                [0, srx,  crx, 0],
-                [0,   0,    0, 1]
-            ]
-        )
-        T_ry = np.array(
-            [
-                [cry, 0, -sry, 0],
-                [0  , 1,    0, 0],
-                [sry, 0,  cry, 0],
-                [0  , 0,    0, 1]
-            ]
-        )
-        T_rz = np.array(
-            [
-                [crz, -srz, 0, 0],
-                [srz,  crz, 0, 0],
-                [  0,    0, 1, 0],
-                [  0,    0, 0, 1]
-            ]
-        )
-        T_sc = np.array(
-            [
-                [sx,  0,  0, 0],
-                [ 0, sy,  0, 0],
-                [ 0,  0, sz, 0],
-                [ 0,  0,  0, 1]
-            ]
-        )
-        T_sh = np.array(
-            [
-                [   1, shyx, shzx, 0],
-                [shxy,    1, shzy, 0],
-                [shxz, shyz,    1, 0],
-                [   0,    0,    0, 1]
-            ]
-        )
-
-        T_pre = np.array(
-            [
-                [],
-                [],
-                [],
-                []
-            ]
-        )
-
-        T_post = np.array(
-            [
-                [],
-                [],
-                [],
-                []
-            ]
-        )
         #TODO: rotate about the centre
 
-        T_tot = T_t @ T_rx @ T_ry @ T_rz @ T_sh @ T_sc
+        T_tot = T_t @ T_r @ T_sh @ T_sc
         return cls(T_tot)
 
     @classmethod
@@ -387,11 +330,31 @@ class AffineTransform:
 
         return transform
 
+    # Methods
     def randomise(self, seed: int) -> None:
         """Randomise the parameters of the transform.
         
         """
         rng = np.random.default_rng(seed)
+
+        theta, phi = rand_angle(rng)
+        x, y, z = rand_translation(
+            rng,
+            xmin=-1,
+            xmax=1,
+            ymin=-1,
+            ymax=1,
+            zmin=-1,
+            zmax=1
+        )
+        sx, sy, sz = rand_scale(rng)
+        shxy, shxz, shyx, shyz, shzx, shzy = rand_shear(rng)
+
+        T_t = self.translation_matrix(x, y, z)
+        T_r = self.rotation_matrix(theta, phi, 0)
+        T_c = self.scaling_matrix(sx, sy, sz)
+        T_h = self.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
+
         raise NotImplementedError
 
     def transform_shape(self, shape: Shapes, **kwargs) -> Shapes:
@@ -424,6 +387,139 @@ class AffineTransform:
         s = Shapes(resampled_dist)
         return s
 
+    @staticmethod
+    def translation_matrix(
+        tx: float,
+        ty: float, 
+        tz: float
+    ) -> np.ndarray:
+        """A 3D translation matrix.
+
+        Parameters
+        ----------
+        tx : float
+            translation in the x direction
+
+        ty : float
+            translation in the y direction
+
+        tz : float
+            translation in the z direction
+
+        Returns
+        -------
+        np.ndarray
+            The translation matrix defined by the input parameters
+    
+        """
+        mat = np.array(
+            [
+                [1, 0, 0, tx],
+                [0, 1, 0, ty],
+                [0, 0, 1, tz],
+                [0, 0, 0,  1]
+            ]
+        )
+        return mat
+
+    @staticmethod
+    def rotation_matrix(
+        r1: float,
+        r2: float,
+        r3: float, *,
+        mode: str='cartesian',
+        angle_type: str='rad'
+    ) -> np.ndarray:
+        """A 3D rotation matrix.
+        
+        """
+        if angle_type == 'deg':
+            rad1 = (np.pi / 180) * r1
+            rad2 = (np.pi / 180) * r2
+            rad3 = (np.pi / 180) * r3
+        elif angle_type == 'rad':
+            rad1 = r1
+            rad2 = r2
+            rad3 = r3
+        else:
+            raise ValueError(f"Unknown angle_type {angle_type}, angle_type must be one of: 'deg', 'rad'.")
+
+        if mode == 'cartesian':
+            crx, cry, crz = np.cos((rad1, rad2, rad3))
+            srx, sry, srz = np.sin((rad1, rad2, rad3))
+
+            T_rx = np.array(
+                [
+                    [1,   0,    0, 0],
+                    [0, crx, -srx, 0],
+                    [0, srx,  crx, 0],
+                    [0,   0,    0, 1]
+                ]
+            )
+            T_ry = np.array(
+                [
+                    [cry, 0, -sry, 0],
+                    [0  , 1,    0, 0],
+                    [sry, 0,  cry, 0],
+                    [0  , 0,    0, 1]
+                ]
+            )
+            T_rz = np.array(
+                [
+                    [crz, -srz, 0, 0],
+                    [srz,  crz, 0, 0],
+                    [  0,    0, 1, 0],
+                    [  0,    0, 0, 1]
+                ]
+            )
+
+            mat = T_rx @ T_ry @ T_rz
+        else:
+            raise ValueError(f"Unknown mode {mode}, mode must be one of: 'cartesian'.")
+
+        return mat
+
+    @staticmethod
+    def scaling_matrix(
+        sx: float,
+        sy: float,
+        sz: float
+    ) -> np.ndarray:
+        """A 3D scaling matrix.
+        
+        """
+        mat = np.array(
+            [
+                [sx,  0,  0, 0],
+                [ 0, sy,  0, 0],
+                [ 0,  0, sz, 0],
+                [ 0,  0,  0, 1]
+            ]
+        )
+        return mat
+
+    @staticmethod
+    def shearing_matrix(
+        shxy: float,
+        shxz: float,
+        shyx: float,
+        shyz: float,
+        shzx: float,
+        shzy: float
+    ) -> np.ndarray:
+        """A 3D shearing matrix.
+        
+        """
+        mat = np.array(
+            [
+                [   1, shyx, shzx, 0],
+                [shxy,    1, shzy, 0],
+                [shxz, shyz,    1, 0],
+                [   0,    0,    0, 1]
+            ]
+        )
+        return mat
+
 
 class Distribution:
     def __init__(self, dist: np.ndarray) -> None:
@@ -432,15 +528,18 @@ class Distribution:
         """
         self._dist = dist
 
+    # Properties
     @property
     def dist(self):
         return self._dist
 
+    # Constructors
     @classmethod
     def from_collection(cls, collection: list[Shapes]):
         total = sum(collection)
         return cls(total.dist)
 
+    # Methods
     def save(self, filename):
         filepath = Path(filename)
         np.save(filepath, self.dist)
