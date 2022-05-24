@@ -457,7 +457,7 @@ def deformation_field_from_affine_matrix(
     
     """
     x, y, z = np.mgrid[:shape[0], :shape[1], :shape[2]]
-    coords = np.stack(x.flatten(), y.flatten(), z.flatten(), np.ones(x.size))
+    coords = np.stack((x.flatten(), y.flatten(), z.flatten(), np.ones(x.size)))
 
     trans_coords = aff_mat @ coords
 

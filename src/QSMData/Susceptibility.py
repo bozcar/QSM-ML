@@ -1,6 +1,5 @@
 from math import floor
 from pathlib import Path
-from types import NotImplementedType
 
 import numpy as np
 
@@ -205,13 +204,21 @@ class Shapes:
 
         x, y, z = np.mgrid[:xlim, :ylim, :zlim]
 
-        inside = (np.abs(x - xc)) < r & (np.abs(y - yc)) < r & (np.abs(z - zc)) < r
+        inside = ((np.abs(x - xc)) < r & (np.abs(y - yc)) < r) & ((np.abs(z - zc)) < r)
 
         s = np.where(
             inside,
             value * np.ones(shape),
             np.zeros(shape)
         )
+        return cls(s)
+
+    @classmethod
+    def empty(
+        cls,
+        shape: tuple[int]
+    ):
+        s = np.zeros(shape)
         return cls(s)
 
 
@@ -355,7 +362,9 @@ class AffineTransform:
         T_c = self.scaling_matrix(sx, sy, sz)
         T_h = self.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
 
-        raise NotImplementedError
+        #TODO: rotate about image centre
+        T_tot = T_t @ T_r @ T_h @ T_c
+        self.matrix = T_tot
 
     def transform_shape(self, shape: Shapes, **kwargs) -> Shapes:
         """Produce a `Shapes` obejct by transforming a shape with the affine transform.

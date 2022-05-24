@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 
-from .Susceptibility import Shapes, Distribution
+from .Susceptibility import Shapes, Distribution, AffineTransform
 
 
 def parse_arguments():
@@ -26,6 +26,12 @@ def parse_arguments():
         help="The number of cuboids in the susceptibility distribution.",
         type=int
     )
+    parser.add_argument(
+        '--shape',
+        '-s',
+        help="The number of pixels in each image dimension",
+        type=list[int] #TODO: test this, I'm sure it will break.
+    )
 
     arguments = parser.parse_args()
     return arguments
@@ -46,16 +52,25 @@ def generate(args: ArgumentParser):
         the number of cuboids in the susceptibility distribution
     
     """
-    collection = []
-    
-    for _ in range(args.no_spheres):
-        collection.append(Shapes.sphere())
-    for _ in range(args.no_cylinders):
-        collection.append(Shapes.cylinder())
-    for _ in range(args.no_cuboids):
-        collection.append(Shapes.cuboid())
+    transform = AffineTransform.from_random()
 
-    dist = Distribution.from_collection(collection)
+    img = Shapes.empty((64, 64, 64))
+
+    sphere = Shapes.sphere((64, 64, 64))
+    cube = Shapes.cube((64, 64, 64))
+    cylinder = Shapes.cylinder((64, 64, 64))
+
+    for _ in range(args.no_spheres):
+        transform.randomise()
+        img += transform(sphere)
+    for _ in range(args.no_cylinders):
+        transform.randomise()
+        img += transform(cylinder)
+    for _ in range(args.no_cuboids):
+        transform.randomise()
+        img += transform(cube)
+
+    dist = Distribution.from_collection(img)
 
 
 def main():
