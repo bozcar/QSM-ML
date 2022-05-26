@@ -1,6 +1,7 @@
 from math import floor
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from .utils import *
@@ -15,7 +16,7 @@ class Shapes:
         self._shape = dist.shape
 
     def __add__(self, other):
-        dist_sum = self.dist + other.dist
+        dist_sum = np.nansum((self.dist, other.dist), axis=0)
         return Shapes(dist_sum)
 
     def __radd__(self, other):
@@ -23,6 +24,16 @@ class Shapes:
             return self
         return self.__add__(other)
 
+    def __sub__(self, other):
+        dist_diff = np.nansum((self.dist, -other.dist), axis=0)
+        return(Shapes(dist_diff))
+
+    def __rsub__(self, other):
+        if other == 0:
+            return self
+        negative_shape = Shapes(-self.dist)
+        diff_shape = negative_shape + other
+        return diff_shape
     # Properties
     @property
     def dist(self):
@@ -144,7 +155,7 @@ class Shapes:
 
         x, y, z = np.mgrid[:xlim, :ylim, :zlim]
 
-        inside = ((x - xc)**2 + (y - yc)**2 < r ** 2) & (np.abs(z - zc)) < r
+        inside = ((x - xc)**2 + (y - yc)**2 < r ** 2) & (np.abs(z - zc) < r)
 
         s = np.where(
             inside,
@@ -221,6 +232,16 @@ class Shapes:
         s = np.zeros(shape)
         return cls(s)
 
+    def display_slice(self, n, /):
+        """Display a slice through the distribution.
+        
+        """
+        plt.figure()
+        plt.imshow(self.dist[:, :, n], cmap='gray')
+        plt.axis('off')
+
+        plt.show()
+
 
 class AffineTransform:
     def __init__(self, matrix:np.ndarray) -> None:
@@ -233,8 +254,8 @@ class AffineTransform:
         """
         self._matrix = matrix
 
-    def __call__(self, object):
-        return self.transform_shape(object)
+    def __call__(self, object, **kwargs):
+        return self.transform_shape(object, **kwargs)
 
     def __repr__(self):
         return str(self.matrix)
@@ -274,6 +295,7 @@ class AffineTransform:
     def from_params(
         cls, 
         params: tuple[float]=(0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0.),
+        shape: tuple[float]=None,
         **kwargs
         ):
         """Construct affine transformation matrix from affine parameters.
@@ -303,9 +325,16 @@ class AffineTransform:
         T_sc = cls.scaling_matrix(sx, sy, sz)
         T_sh = cls.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
 
-        #TODO: rotate about the centre
+        if shape:
+            centre = np.array(shape) / 2
 
-        T_tot = T_t @ T_r @ T_sh @ T_sc
+            T_pre = cls.translation_matrix(*-centre)
+            T_post = cls.translation_matrix(*centre)
+        else:
+            T_pre = np.eye(4)
+            T_post = np.eye(4)
+
+        T_tot = T_t @ T_post @ T_r @ T_sh @ T_sc @ T_pre
         return cls(T_tot)
 
     @classmethod
@@ -338,7 +367,7 @@ class AffineTransform:
         return transform
 
     # Methods
-    def randomise(self, seed: int) -> None:
+    def randomise(self, seed: int, shape: tuple[int]=None) -> None:
         """Randomise the parameters of the transform.
         
         """
@@ -362,8 +391,16 @@ class AffineTransform:
         T_c = self.scaling_matrix(sx, sy, sz)
         T_h = self.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
 
-        #TODO: rotate about image centre
-        T_tot = T_t @ T_r @ T_h @ T_c
+        if shape:
+            centre = np.array(shape) / 2
+
+            T_pre = self.translation_matrix(*-centre)
+            T_post = self.translation_matrix(*centre)
+        else:
+            T_pre = np.eye(4)
+            T_post = np.eye(4)
+
+        T_tot = T_t @ T_post @ T_r @ T_h @ T_c @ T_pre
         self.matrix = T_tot
 
     def transform_shape(self, shape: Shapes, **kwargs) -> Shapes:
