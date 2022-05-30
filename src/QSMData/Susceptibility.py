@@ -13,7 +13,6 @@ class Shapes:
         
         """
         self._dist = dist
-        self._shape = dist.shape
 
     def __add__(self, other):
         dist_sum = np.nansum((self.dist, other.dist), axis=0)
@@ -34,14 +33,30 @@ class Shapes:
         negative_shape = Shapes(-self.dist)
         diff_shape = negative_shape + other
         return diff_shape
+    
+    def __getitem__(self, item):
+        return Shapes(self.dist[item])
+
     # Properties
     @property
     def dist(self):
         return self._dist
 
+    @dist.setter
+    def dist(self, new_dist:np.ndarray):
+        self._dist = new_dist
+
     @property
     def shape(self):
-        return self._shape
+        return self.dist.shape
+
+    @property
+    def phase(self):
+        D = self.dipole_kernel(self.shape)
+
+        kdist = np.fft.fftn(self.dist)
+        conv = np.real(np.fft.ifftn(kdist * D))
+        return Shapes(conv)
 
     # Constructors
     @classmethod
@@ -87,10 +102,8 @@ class Shapes:
         r = floor(shortest / 4)
 
         xlim, ylim, zlim = shape
-        #centres
-        xc = floor(xlim / 2)
-        yc = floor(ylim / 2)
-        zc = floor(zlim / 2)
+
+        xc, yc, zc = np.array(shape) // 2
 
         x, y, z = np.mgrid[:xlim, :ylim, :zlim]
         inside = (x - xc)**2 + (y - yc)**2 + (z - zc)**2 < r**2
@@ -100,7 +113,7 @@ class Shapes:
             value * np.ones(shape),
             np.zeros(shape)
         )
-        return cls(s) #TODO: check centre calculation
+        return cls(s)
 
     @classmethod
     def cylinder(
@@ -215,7 +228,7 @@ class Shapes:
 
         x, y, z = np.mgrid[:xlim, :ylim, :zlim]
 
-        inside = ((np.abs(x - xc)) < r & (np.abs(y - yc)) < r) & ((np.abs(z - zc)) < r)
+        inside = ((np.abs(x - xc)) < r) & ((np.abs(y - yc)) < r) & ((np.abs(z - zc)) < r)
 
         s = np.where(
             inside,
@@ -241,6 +254,45 @@ class Shapes:
         plt.axis('off')
 
         plt.show()
+
+    def pad(self, pad_width = None):
+        if pad_width == None:
+            pad_width = (
+                (self.shape[0]//2, self.shape[0]//2),
+                (self.shape[1]//2, self.shape[1]//2),
+                (self.shape[2]//2, self.shape[2]//2)
+            )
+        
+        self.dist = np.pad(np.copy(self.dist), pad_width)
+        return
+
+    def save(self, filename: str, dir: str="./data/") -> None:
+        #TODO: improve
+        NPY = ".npy"
+
+        dir_path = Path(dir)
+
+        if dir_path.is_dir():
+            filepath = dir_path / (filename + NPY)
+            np.save(filepath, self.dist)
+            return
+        else:
+            raise FileNotFoundError(f"Directory {str(dir_path.resolve())} does not exist.")
+
+    @staticmethod
+    def dipole_kernel(shape: tuple[int]) -> np.ndarray:
+        ONE_THIRD = 1 / 3
+
+        xv, yv, zv = np.mgrid[-1:1:shape[0]*1j, -1:1:shape[1]*1j, -1:1:shape[2]*1j]
+
+        denom = xv**2 + yv**2 + zv**2
+        z_sq = zv**2
+
+        kernel = np.zeros(shape)
+        kernel[denom != 0] = (ONE_THIRD - (z_sq / denom))[denom != 0]
+        kernel = np.fft.fftshift(kernel)
+
+        return kernel
 
 
 class AffineTransform:
@@ -289,6 +341,14 @@ class AffineTransform:
     @matrix.deleter
     def matrix(self):
         del self._matrix
+
+    @property
+    def rng(self):
+        return self._rng
+
+    @rng.setter
+    def rng(self, seed: int):
+        self._rng = np.random.default_rng(seed)
 
     # Constructors
     @classmethod
@@ -367,29 +427,15 @@ class AffineTransform:
         return transform
 
     # Methods
-    def randomise(self, seed: int, shape: tuple[int]=None) -> None:
+    def randomise(self, seed: int=None, shape: tuple[int]=None) -> None:
         """Randomise the parameters of the transform.
         
         """
-        rng = np.random.default_rng(seed)
+        if not hasattr(self, 'rng'):
+            self.rng = seed
 
-        theta, phi = rand_angle(rng)
-        x, y, z = rand_translation(
-            rng,
-            xmin=-1,
-            xmax=1,
-            ymin=-1,
-            ymax=1,
-            zmin=-1,
-            zmax=1
-        )
-        sx, sy, sz = rand_scale(rng)
-        shxy, shxz, shyx, shyz, shzx, shzy = rand_shear(rng)
-
-        T_t = self.translation_matrix(x, y, z)
-        T_r = self.rotation_matrix(theta, phi, 0)
-        T_c = self.scaling_matrix(sx, sy, sz)
-        T_h = self.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
+        if seed:
+            self.rng = seed
 
         if shape:
             centre = np.array(shape) / 2
@@ -397,8 +443,32 @@ class AffineTransform:
             T_pre = self.translation_matrix(*-centre)
             T_post = self.translation_matrix(*centre)
         else:
+            centre = np.zeros(3) # Is this what I want?
+            
             T_pre = np.eye(4)
-            T_post = np.eye(4)
+            T_post = np.eye(4)   
+
+        theta, phi = rand_angle(self.rng)
+        # theta, phi = [0, 0]
+        x, y, z = rand_translation(
+            self.rng,
+            xmin=-centre[0],
+            xmax=centre[0],
+            ymin=-centre[1],
+            ymax=centre[1],
+            zmin=-centre[2],
+            zmax=centre[2]
+        )
+        # x, y, z = [30, 0, 0]
+        # sx, sy, sz = [3, 1, 1]
+        sx, sy, sz = rand_scale(self.rng)
+        # shxy, shxz, shyx, shyz, shzx, shzy = [0, 0, 0, 0, 0, 0]
+        shxy, shxz, shyx, shyz, shzx, shzy = rand_shear(self.rng)
+
+        T_t = self.translation_matrix(x * sx, y * sy, z * sz)
+        T_r = self.rotation_matrix(theta, phi, 0)
+        T_c = self.scaling_matrix(sx, sy, sz)
+        T_h = self.shearing_matrix(shxy, shxz, shyx, shyz, shzx, shzy)
 
         T_tot = T_t @ T_post @ T_r @ T_h @ T_c @ T_pre
         self.matrix = T_tot

@@ -538,12 +538,12 @@ def rand_translation(
 
 def rand_scale(
     rng: np.random.Generator, *,
-    xmax: float = 1,
-    xmin: float = 0,
-    ymax: float = 1,
-    ymin: float = 0,
-    zmax: float = 1,
-    zmin: float = 0
+    xmax: float = 4,
+    xmin: float = 1,
+    ymax: float = 4,
+    ymin: float = 1,
+    zmax: float = 4,
+    zmin: float = 1
 ) -> tuple[float]:
     xrange = xmax - xmin
     yrange = ymax - ymin
