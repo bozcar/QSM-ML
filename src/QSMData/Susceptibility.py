@@ -52,10 +52,11 @@ class Shapes:
 
     @property
     def phase(self):
-        D = self.dipole_kernel(self.shape)
+        D = self.dipole_kernel(self.shape[-3:])
+        dims = len(self.shape)
 
-        kdist = np.fft.fftn(self.dist)
-        conv = np.real(np.fft.ifftn(kdist * D))
+        kdist = np.fft.fftn(self.dist, axes=(dims - 3, dims - 2, dims - 1))
+        conv = np.real(np.fft.ifftn(kdist * D, axes=(dims - 3, dims - 2, dims - 1)))
         return Shapes(conv)
 
     # Constructors
@@ -660,3 +661,10 @@ class Distribution:
         filepath = Path(filename)
         np.save(filepath, self.dist)
         raise NotImplementedError
+
+
+def join_shapes(shapes: list[Shapes]) -> Shapes:
+    joint_dist = np.array([shape.dist for shape in shapes])
+    joint_shape = Shapes(joint_dist)
+    return joint_shape
+

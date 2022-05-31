@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
+import threading
 
-from .Susceptibility import Shapes, AffineTransform
+from .Susceptibility import Shapes, AffineTransform, join_shapes
 
 
 def parse_arguments():
@@ -40,9 +41,21 @@ def parse_arguments():
         default=None
     )
     parser.add_argument(
-        '--path',
-        '-p',
-        help="The path to save the generated image to."
+        '--filename',
+        '-f',
+        help="The filename to save the generated image to."
+    )
+    parser.add_argument(
+        '--dir',
+        '-d',
+        help="The directory to save the geneated image to."
+    )
+    parser.add_argument(
+        '--no_images',
+        '-i',
+        help="The number of images to produce.",
+        type=int,
+        default=1
     )
 
     arguments = parser.parse_args()
@@ -91,31 +104,103 @@ def generate(
     return img
 
 
-def main():
-    args = parse_arguments()
-    path = args.path
-
+def if_single_img(
+    shape,
+    seed,
+    no_spheres,
+    no_cuboids,
+    no_cylinders,
+    filename
+):
     img = generate(
-        shape=args.shape,
-        seed=args.seed,
-        no_spheres=args.no_spheres,
-        no_cuboids=args.no_cuboids,
-        no_cylinders=args.no_cylinders
+        shape=shape,
+        seed=seed,
+        no_spheres=no_spheres,
+        no_cuboids=no_cuboids,
+        no_cylinders=no_cylinders
     )
-    if path:
-        img.save(path)
+
+    if filename:
+        img.save(filename)
 
     img.pad()
     phase = img.phase[
-        args.shape[0]//2 : args.shape[0]//2 + args.shape[0],
-        args.shape[1]//2 : args.shape[1]//2 + args.shape[1],
-        args.shape[2]//2 : args.shape[2]//2 + args.shape[2]
+        shape[0]//2 : shape[0]//2 + shape[0],
+        shape[1]//2 : shape[1]//2 + shape[1],
+        shape[2]//2 : shape[2]//2 + shape[2]
     ]
-    if path:
-        phase.save(path + "_phase")
 
-    img.display_slice(args.shape[2]//2)
-    phase.display_slice(args.shape[2]//2)
+    if filename:
+        phase.save(filename + "_phase")
+
+
+def if_multiple_imgs(
+    no_images,
+    shape,
+    seed,
+    no_spheres,
+    no_cuboids,
+    no_cylinders,
+    filename
+):
+    imgs = []
+    for _ in range(no_images):
+        img = generate(
+            shape=shape,
+            seed=seed,
+            no_spheres=no_spheres,
+            no_cuboids=no_cuboids,
+            no_cylinders=no_cylinders
+        )
+        imgs.append(img)
+    img = join_shapes(imgs)
+
+    if filename:
+        img.save(filename)
+    
+    img.pad(
+        (
+            (0, 0),
+            (shape[0]//2, shape[0]//2),
+            (shape[1]//2, shape[1]//2),
+            (shape[2]//2, shape[2]//2)
+        )
+    )
+    phase = img.phase[
+        :,
+        shape[0]//2 : shape[0]//2 + shape[0],
+        shape[1]//2 : shape[1]//2 + shape[1],
+        shape[2]//2 : shape[2]//2 + shape[2]
+    ]
+
+    if filename:
+        phase.save(filename + "_phase")
+
+
+def main():
+    args = parse_arguments()
+
+    if args.no_images == 1:
+        if_single_img(
+            shape=args.shape,
+            seed=args.seed,
+            no_spheres=args.no_spheres,
+            no_cuboids=args.no_cuboids,
+            no_cylinders=args.no_cylinders,
+            filename=args.filename
+        )
+    elif args.no_images > 1:
+        if_multiple_imgs(
+            no_images=args.no_images,
+            shape=args.shape,
+            seed=args.seed,
+            no_spheres=args.no_spheres,
+            no_cuboids=args.no_cuboids,
+            no_cylinders=args.no_cylinders,
+            filename=args.filename
+        )
+    else:
+        raise ValueError("The number of images must be a positive integer.")
 
 
 if __name__ == '__main__':
