@@ -6,8 +6,8 @@ import utils.NDI as NDI
 import utils.image_handling as image_handling
 
 def main():
-    pm_path = Path("Replication/Datasets/Frequency.nii")
-    mask_path = Path("Replication/Datasets/MaskBrainExtracted.nii")
+    pm_path = Path(r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\data\Sim2Snr2\Frequency.nii.gz")
+    mask_path = Path(r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\data\Sim2Snr2\MaskBrainExtracted.nii.gz")
 
     pm = phase_map.phase_map(pm_path)
     mask = phase_map.phase_map(mask_path)

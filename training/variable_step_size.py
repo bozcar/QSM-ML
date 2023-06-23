@@ -2,7 +2,7 @@ if __name__ == '__main__':
     import numpy as np
     from tensorflow import keras
 
-    from QSMLearn.models import FixedStepNDI
+    from QSMLearn.models import VariableStepNDI
 
     x = np.load(r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\data\x_train_1.npy")
 
@@ -11,9 +11,8 @@ if __name__ == '__main__':
     x_train = np.array([[item, np.ones(SHAPE)] for item in x])
     y_train = np.load(r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\data\y_train_1.npy")
 
-    m = FixedStepNDI(
-        iters = 20,
-        init_step = 1.
+    m = VariableStepNDI(
+        iters = 20
     )
 
     m.compile(
@@ -40,7 +39,7 @@ if __name__ == '__main__':
                 verbose = 1
             ),
             keras.callbacks.ModelCheckpoint(
-                filepath=r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\training\trained_models\best_model",
+                filepath=r"C:\Users\bozth\Documents\UCL\MRes_Project\QSM-ML\training\trained_models\best_var_NDI",
                 save_weights_only=True,
                 moitor='val_accuracy',
                 mode='max',

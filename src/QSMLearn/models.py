@@ -6,6 +6,17 @@ from tensorflow import keras
 from .layers import *
 
 
+class TKDModel(keras.Model):
+    r"""Truncated K-space Division (TKD) with learnable threshold value.
+    """
+    def __init__(self):
+        raise NotImplementedError
+    
+    @tf.function
+    def call(self):
+        raise NotImplementedError
+
+
 def NDIGrad(
     sus: tf.Tensor, 
     phase: tf.Tensor, 
@@ -130,7 +141,9 @@ class VariableStepNDI(keras.Model):
 
     @tf.function
     def call(self, phase: tf.Tensor, weight: tf.Tensor) -> tf.Tensor:
-        """Applies each of the `iters` `WeightedSubtract` layers."""
+        """Applies each of the `iters` `WeightedSubtract` layers.
+        
+        """
         sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
         pha = tf.cast(phase, dtype=tf.complex64)
         wei = tf.cast(weight, dtype=tf.complex64)
@@ -143,3 +156,39 @@ class VariableStepNDI(keras.Model):
             i += 1
         
         return sus
+
+
+class FISTA(keras.Model):
+    """Fast Iterative Shrinkage/Thresholding Algorithm
+
+    An implementation of FISTA as a trainable model.
+
+    Parameters
+    ----------
+    iters : int
+        The maximum number of iterations of the model.
+    
+    """
+    def __init__(self,
+        iters: int,
+        forward_op: keras.layers.Layer,
+        shrinkage: keras.layers.Layer,
+        name: str=None
+    ) -> None:
+        super().__init__(name)
+        self.iters = iters
+        self.forward_op = forward_op
+        self.shrinkage = shrinkage
+
+    @tf.function
+    def call(self):
+        """
+        
+        """
+        for _ in range(self.iters):
+            self._ISTA_step()
+        raise NotImplementedError
+
+    @staticmethod
+    def _ISTA_step():
+        raise NotImplementedError

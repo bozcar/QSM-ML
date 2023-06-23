@@ -1,12 +1,10 @@
-from email.mime import base
 import os
 from pathlib import Path
 import re
-from typing import Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorboard
 import tensorflow as tf
 
 from .layers import ConvDipole
@@ -221,3 +219,27 @@ class shapeCollection:
                         np.save(base_dir / f"{filename}")
         else:
             raise ValueError(f"Cannot save to {str(base_dir.absolute())}: directory does not exist.")
+
+    @classmethod
+    def from_npy(cls, filename: str):
+        filepath = Path(filename)
+
+        if filepath.exists():
+            np_rep = np.load(filepath)
+            t = tf.constant(np_rep)
+            return cls(t)
+
+
+class TrainingData:
+    def __init__(self, array: np.ndarray) -> None:
+        self.array = array
+        self.shape = array.shape
+
+    def __str__(self) -> str:
+        return str(self.array)
+
+    @staticmethod
+    def sphere(shape: Tuple[int], centre: Tuple[float], radius: float):
+        x, y, z = np.mgrid[0:shape[0], 0:shape[1], 0:shape[2]]
+
+        (x - centre[0])**2 + (y - centre[1])**2 + (z - centre[2])**2 < radius

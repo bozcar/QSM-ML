@@ -41,7 +41,7 @@ class dipole_kernel_nsq:
         vx, vy, vz = np.meshgrid(x, y, z, sparse=False, indexing='ij')
 
         denom = vx**2 + vy**2 + vz**2
-        z_squared = vz**2
+        z_squared = vy**2
 
         self.kernel = np.zeros(size)
         self.kernel[denom != 0] = ONE_THIRD - (z_squared[denom != 0]/denom[denom != 0])

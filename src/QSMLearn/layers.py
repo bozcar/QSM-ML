@@ -76,7 +76,9 @@ class ConvDipole(layers.Layer):
 
     @staticmethod
     def generate_dipole(shape: Tuple[int]):
-        """Generate a dipole kernel in k-space with the given `shape`."""
+        """Generate a dipole kernel in k-space with the given `shape`.
+        
+        """
         ONE_THIRD = 1/3
 
         x = tf.linspace(-1, 1, shape[0])
@@ -86,7 +88,7 @@ class ConvDipole(layers.Layer):
         vx, vy, vz = tf.meshgrid(x, y, z, indexing='ij')
 
         denom = vx**2 + vy**2 + vz**2
-        z_squared = vz**2
+        z_squared = vy**2
 
         kernel = tf.where(denom!=0, ONE_THIRD-(z_squared/denom), tf.zeros(shape, dtype = tf.float64))
         kernel = tf.signal.fftshift(kernel)
@@ -124,3 +126,4 @@ class WeightedSubtract(layers.Layer):
     @tf.function
     def call(self, img, diff):
         return img - (self.tau * diff)
+
