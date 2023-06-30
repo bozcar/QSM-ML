@@ -19,14 +19,12 @@ class TKDModel(keras.Model):
 
 def NDIGrad(
     sus: tf.Tensor, 
-    phase: tf.Tensor, 
-    weight: tf. Tensor, 
+    phase: tf.Tensor,
     conv: ConvDipole
 ) -> tf.Tensor:
     """The gradient of the NDI cost function."""
-    w_squared = weight * weight
     diff = conv(sus) - phase
-    return conv(w_squared * tf.math.sin(diff))
+    return conv(tf.math.sin(diff))
 
 
 class NDIModel:
@@ -140,17 +138,15 @@ class VariableStepNDI(keras.Model):
         self.steps = [WeightedSubtract(name=f"setp{i}") for i in range(iters)]
 
     @tf.function
-    def call(self, phase: tf.Tensor, weight: tf.Tensor) -> tf.Tensor:
+    def call(self, phase: tf.Tensor) -> tf.Tensor:
         """Applies each of the `iters` `WeightedSubtract` layers.
         
         """
-        sus = tf.cast(tf.zeros(tf.shape(phase)), dtype=tf.complex64)
-        pha = tf.cast(phase, dtype=tf.complex64)
-        wei = tf.cast(weight, dtype=tf.complex64)
-
+        sus = tf.zeros(tf.shape(phase))
+        
         i = 0
         for step in self.steps:
-            sus = step(sus, NDIGrad(sus, pha, wei, self.dipole_convolution))
+            sus = step(sus, NDIGrad(sus, phase, self.dipole_convolution))
             if i % 10 == 0:
                 print(f"Iteration {i+1}/{len(self.steps)} complete.")
             i += 1
