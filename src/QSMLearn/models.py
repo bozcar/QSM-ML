@@ -17,6 +17,7 @@ class TKDModel(keras.Model):
         raise NotImplementedError
 
 
+@tf.function
 def NDIGrad(
     sus: tf.Tensor, 
     phase: tf.Tensor,
@@ -132,10 +133,11 @@ class VariableStepNDI(keras.Model):
         An optional name for the model
     
     """
-    def __init__(self, iters: int, name: str = None) -> None:
+    def __init__(self, iters: int, name: str = None, verbose: bool = True) -> None:
         super().__init__(name)
         self.dipole_convolution = ConvDipole()
         self.steps = [WeightedSubtract(name=f"setp{i}") for i in range(iters)]
+        self.verbosity = verbose
 
     @tf.function
     def call(self, phase: tf.Tensor) -> tf.Tensor:
@@ -147,7 +149,7 @@ class VariableStepNDI(keras.Model):
         i = 0
         for step in self.steps:
             sus = step(sus, NDIGrad(sus, phase, self.dipole_convolution))
-            if i % 10 == 0:
+            if i % 10 == 9 and self.verbosity == True:
                 print(f"Iteration {i+1}/{len(self.steps)} complete.")
             i += 1
         

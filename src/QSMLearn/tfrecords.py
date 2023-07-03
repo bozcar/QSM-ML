@@ -1,5 +1,5 @@
 '''
-File copied from [Name of repo] for use reading simulated data produced by that project.
+File copied from [Name of repo] and refactored for use reading simulated data produced by that project.
 '''
 
 
@@ -44,12 +44,14 @@ def convert_tfrecords(fase, magnitud, labels, name):
 # read and decode functions
 def decode_data(coded_data, shape):
     with tf.device("cpu"):
-        data = tf.io.decode_raw(coded_data, tf.float32)
-        data = tf.reshape(data, shape + [1])
-        data = tf.cast(data, tf.float32)
-        return data
+        data = tf.io.decode_raw(
+            coded_data, 
+            tf.float32, 
+            fixed_length=tf.cast(4*shape[0]*shape[1]*shape[2], tf.int32)
+        )
+        return tf.reshape(data, shape)
     
-def _parse_image_function(record_bytes):
+def _parse_image_function(record_bytes, shape):
     with tf.device("cpu"):
         features = tf.io.parse_single_example(
             record_bytes, 
@@ -62,28 +64,23 @@ def _parse_image_function(record_bytes):
                 "mag_raw": tf.io.FixedLenFeature([], tf.string),
             }
         )
-
-        height = features["height"]
-        width = features["width"]
-        depth = features["depth"]
-
-        shape = [height, width, depth]
-
-        fase_raw = features["pha_raw"]
-        mag_raw = features["mag_raw"]
-        label_raw = features["label"]
-
-        fase = decode_data(fase_raw, shape)
-        magnitud = decode_data(mag_raw, shape)
-        image = tf.concat([fase, magnitud], -1)
-
-        label = decode_data(label_raw, shape)
-
-        return {
-            'image': image,
-            'label': label
+        decoded = {
+            'phase': tf.io.decode_raw(
+                features['pha_raw'], 
+                tf.float32,
+                fixed_length=4*shape[0]*shape[1]*shape[2]
+            ),
+            'label': tf.io.decode_raw(
+                features['label'], 
+                tf.float32,
+                fixed_length=4*shape[0]*shape[1]*shape[2]
+            ),
         }
+        return (
+            tf.reshape(decoded['phase'], shape, name='phase'),
+            tf.reshape(decoded['label'], shape, name='label')
+        )
 
-def read_and_decode(filename):
+def read_and_decode(filenames: list[str], shape):
     with tf.device("cpu"):
-        return tf.data.TFRecordDataset(filename).map(_parse_image_function)
+        return tf.data.TFRecordDataset(filenames).map(lambda x: _parse_image_function(x, shape))
