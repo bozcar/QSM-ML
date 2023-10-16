@@ -1,0 +1,2 @@
+model_checkpoint_path: "best_var_NDI"
+all_model_checkpoint_paths: "best_var_NDI"

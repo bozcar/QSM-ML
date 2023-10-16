@@ -1,0 +1,14 @@
+{
+    "paths": {
+        "dataDir": "D:\\48data_normal4",
+        "logDir": "C:\\Users\\bozth\\Documents\\UCL\\MRes_Project\\QSM-ML\\training\\logs"
+    },
+    "modelConfig": {
+        "iters": 200,
+        "maxEpochs": 500,
+        "initialLearningRate": 0.01,
+        "earlyStoppingPatience": 10,
+        "plateauPatience": 5,
+        "plateauFactor": 0.5
+    }
+}

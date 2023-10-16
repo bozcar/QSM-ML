@@ -1,0 +1,233 @@
+from typing import Tuple
+
+import tensorflow as tf
+from tensorflow import keras
+
+from .layers import *
+
+
+class TKDModel(keras.Model):
+    r"""Truncated K-space Division (TKD) with learnable threshold value.
+    
+    """
+    def __init__(self):
+        raise NotImplementedError
+    
+    @tf.function
+    def call(self):
+        raise NotImplementedError
+
+
+@tf.function
+def NDIGrad(
+    sus: tf.Tensor, 
+    phase: tf.Tensor,
+    conv: ConvDipole
+) -> tf.Tensor:
+    """The gradient of the NDI cost function."""
+    diff = conv(sus) - phase
+    return conv(tf.math.sin(diff))
+
+
+class NDIModel:
+    r"""Base class for implementing Nonlinear Dipole Inversion (NDI).
+
+    This class allows for easy implementation of the NDI algorithm as a keras model.
+    This allows variables like the step size `tau` of the model to be trained to 
+    find optimal parameters for the model. 
+    
+    To use this class, define a subclass which where it's call function passes a function 
+    defining how perform gradient decent steps into the parent calsses call function as 
+    the `do_steps` parameter.
+
+    Parameters
+    ----------
+    name : str, optional
+        An optional name for the model
+
+    Notes
+    -----
+    This class is intended to implemet unregularised NDI. This algorithm seeks to minimize 
+    the cost function 
+    
+    .. math::
+    
+        f\left(\vec{\chi}\right)=\left|\left|W\left(e^{iD\vec{\chi}}-e^{i\vec{\phi}}\right)\right|\right|_2^2
+
+    where :math:`\chi` is the distribution of susceptibility in the image, :math:`W` is a diagonal 
+    weighting matrix (usually a mask covering a region of interest), :math:`D\chi` is the convolution 
+    of the dipole kernel with the susceptibility distribution and :math:`\phi` is the input phase image.
+
+    The gradient of this cost function :math:`\nabla_{\vec{\chi}}f\left(\vec{\chi}\right)` 
+    has been derived analytically as:
+
+    .. math::
+
+        \nabla_{\vec{\chi}}f\left(\vec{\chi}\right) = 2D^{T}W^{T}W\sin\left(D\vec{\chi}-\vec{\phi}\right)
+
+    [1] It is this gradient which is calculated by the method `__NDIGrad`.
+
+    References
+    ----------
+    .. [1] Polak, Daniel; Chatnuntawech, Itthi; Yoon, Jaeyeon; Iyer, Siddharth Srinivasan; Milovic, 
+       Carlos; Lee, Jongho; Bachert, Peter; Adalsteinsson, Elfar; Setsompop, Kawin; Bilgic, Berkin, 
+       "Nonlinear dipole inversion (NDI) enables robust quantitative susceptibility mapping (QSM)"
+       NMR in Biomedicine, vol. 12, pp. e4271, 2020.
+
+    """
+    def __init__(self):
+        self.dipole_convolution = ConvDipole()
+
+    def __NDIGrad(self, sus, phase, weight) -> tf.Tensor:
+        """The gradient of the NDI cost function."""
+        w_squared = weight * weight
+        diff = self.dipole_convolution(sus) - phase
+        return self.dipole_convolution(w_squared * tf.math.sin(diff))
+
+
+class FixedStepNDI(keras.Model):
+    """NDI model with one trainbable step size.
+
+    Class for training the step size of the NDI model. It contains one `WeightedSubtract` layer
+    which is applied a nubmer of times controlled by the parameter `iters`.
+
+    Parameters
+    ----------
+    iters : int
+        The number of iterations of the NDI model which will be applied.
+    name : str, optionsal
+        An optional name for the model
+    
+    """
+    def __init__(self, iters: int, name: str = None, init_step: float = 2) -> None:
+        super().__init__(name)
+        self.iters = iters
+        self.dipole_convolution = ConvDipole()
+        self.step = WeightedSubtract(tau=init_step)
+
+    @tf.function
+    def call(self, t: tf.Tensor) -> tf.Tensor:
+        """Applies the `WeightedSubtract` layer `iters` times."""
+        phase = t[:, 0, :, :, :]
+        weight = t[:, 1, :, :, :]
+        # Cast to complex numbers to allow for fourier transforms
+        sus = tf.zeros(tf.shape(phase))
+
+        for _ in range(self.iters):
+            sus = self.step(sus, NDIGrad(sus, phase, weight, self.dipole_convolution))
+        
+        return sus
+
+
+class VariableStepNDI(keras.Model):
+    """NDI model where each step size can be trained independently.
+
+    Class for training an NDI model where the step size can vary on each 
+    iteration. It contains a nubmer of `WeightedSubtract` layers controlled 
+    by the parameter `iters`
+
+    Parameters
+    ----------
+    iters : int
+        The number of iterations of the NDI model which will be applied.
+    name : str, optional
+        An optional name for the model
+    verbose : bool, optional
+        Whether the model prints progress to the terminal
+    mode : {'s', 'r'}, optional
+        How to initialise the iteration step sizes: 
+        's' - all set to value of 2;
+        'r' - randomly chosen from a uniform distribution between 0 and 1
+
+    """
+    def __init__(self, iters: int, *, name: str = None, verbose: bool = True, mode: str = 's') -> None:
+        super().__init__(name)
+        self.dipole_convolution = ConvDipole()
+        if mode == 's':
+            taus = 2 * tf.ones([iters])
+        elif mode == 'r':
+            taus = tf.random.uniform([iters])
+        self.steps = [WeightedSubtract(tau=t) for t in taus]
+        self.verbosity = verbose
+
+    @tf.function
+    def call(self, phase: tf.Tensor) -> tf.Tensor:
+        """Applies each of the `iters` `WeightedSubtract` layers.
+        
+        """
+        sus = tf.zeros(tf.shape(phase))
+        
+        i = 0
+        for step in self.steps:
+            sus = step(sus, NDIGrad(sus, phase, self.dipole_convolution))
+            if i % 10 == 9 and self.verbosity == True:
+                print(f"Iteration {i+1}/{len(self.steps)} complete.")
+            i += 1
+        
+        return sus
+    
+
+class WeightRegularisedNDI(keras.Model):
+    """
+    
+    """
+    def __init__(self, iters: int, *, name: str = None, verbose: bool = True) -> None:
+        super().__init__(name)
+        self.dipole_convolution = ConvDipole()
+        self.verbosity = verbose
+        self.iters=iters
+        self.w_factor = NoiseFactor()
+
+    def call(self, phase):
+        s = tf.shape(phase)
+
+        sus = tf.zeros(s)
+        w = tf.ones(s)
+
+        del s
+
+        for i in range(self.iters):
+            a = self.dipole_convolution(sus) - phase
+            sus = sus - 2 * self.dipole_convolution(w**2 * tf.sin(a))
+            w = w * self.w_factor(tf.abs(a))
+
+            if i % 10 == 9 and self.verbosity == True:
+                print(f"Iteration {i+1}/{self.iters} complete.")
+
+        return sus
+
+
+class FISTA(keras.Model):
+    """Fast Iterative Shrinkage/Thresholding Algorithm
+
+    An implementation of FISTA as a trainable model.
+
+    Parameters
+    ----------
+    iters : int
+        The maximum number of iterations of the model.
+    
+    """
+    def __init__(self,
+        iters: int,
+        forward_op: keras.layers.Layer,
+        shrinkage: keras.layers.Layer,
+        name: str=None
+    ) -> None:
+        super().__init__(name)
+        self.iters = iters
+        self.forward_op = forward_op
+        self.shrinkage = shrinkage
+
+    @tf.function
+    def call(self):
+        """
+        
+        """
+        for _ in range(self.iters):
+            self._ISTA_step()
+        raise NotImplementedError
+
+    @staticmethod
+    def _ISTA_step():
+        raise NotImplementedError

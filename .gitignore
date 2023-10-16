@@ -197,4 +197,8 @@ cython_debug/
 # Log files
 **/logs
 
+# Direcotries for storing code outputs
+data/*
+outputs/*
+
 # End of https://www.toptal.com/developers/gitignore/api/c++,python,visualstudiocode
